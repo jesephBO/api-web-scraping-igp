@@ -7,8 +7,13 @@ def lambda_handler(event, context):
     # URL de la página web que contiene la tabla
     url = "https://ultimosismo.igp.gob.pe/productos/reportes-sismicos"
 
+    headers_req = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+    
+    
     # Realizar la solicitud HTTP a la página web
-    response = requests.get(url)
+    response = requests.get(url,headers=headers_req)
     if response.status_code != 200:
         return {
             'statusCode': response.status_code,
