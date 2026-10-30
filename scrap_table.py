@@ -3,7 +3,7 @@ import boto3
 import uuid
 
 def lambda_handler(event, context):
-    url = "https://ultimosismo.igp.gob.pe/api/reporte-sismico/ultimo-sismo"
+    url = "https://ultimosismo.igp.gob.pe/productos/reportes-sismicos"
 
     headers_req = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
