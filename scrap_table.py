@@ -1,39 +1,34 @@
 import requests
-from bs4 import BeautifulSoup
 import boto3
 import uuid
 
 def lambda_handler(event, context):
-    url = "https://ultimosismo.igp.gob.pe/productos/reportes-sismicos"
+    url = "https://ultimosismo.igp.gob.pe/api/reporte-sismico/ultimo-sismo"
 
     headers_req = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
 
     response = requests.get(url, headers=headers_req)
     if response.status_code != 200:
         return {
             'statusCode': response.status_code,
-            'body': 'Error al acceder a la página web'
+            'body': 'Error al acceder a la API del IGP'
         }
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Encontrar la tabla en el HTML
-    table = soup.find('table')
-    if not table:
-        return {
-            'statusCode': 404,
-            'body': 'No se encontró la tabla en la página web'
-        }
-
-    headers = [header.text.strip() for header in table.find_all('th')]
-
+    data = response.json()
+    
     rows = []
-    for row in table.find_all('tr')[1:]:  # Omitir el encabezado
-        cells = row.find_all('td')
-        if cells:
-            rows.append({headers[i+1]: cell.text.strip() for i, cell in enumerate(cells) if (i+1) < len(headers)})
+    items = data if isinstance(data, list) else data.get('data', [])
+
+    for item in items:
+        rows.append({
+            'Cod reporte': item.get('codigo', ''),
+            'Referencia': item.get('referencia', ''),
+            'Semáforo': item.get('semaforo', ''),
+            'Magnitud': item.get('magnitud', ''),
+            'Fecha y hora de origen local': item.get('fecha_utc', item.get('fecha_hora', ''))
+        })
 
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('TablaWebScrapping')
