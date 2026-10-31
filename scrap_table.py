@@ -4,64 +4,60 @@ import boto3
 import uuid
 
 def lambda_handler(event, context):
-    # URL de la página web que contiene la tabla
     url = "https://ultimosismo.igp.gob.pe/productos/reportes-sismicos"
 
-    # Realizar la solicitud HTTP a la página web
-    response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+    headers_req = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+
+    response = requests.get(url, headers=headers_req)
     if response.status_code != 200:
         return {
             'statusCode': response.status_code,
-            'body': 'Error al acceder a la página web'
+            'body': 'Error al acceder a la página web del IGP'
         }
 
-    # Parsear el contenido HTML de la página web
     soup = BeautifulSoup(response.content, 'html.parser')
 
-    # Encontrar la tabla en el HTML
     table = soup.find('table')
     if not table:
         return {
             'statusCode': 404,
-            'body': 'No se encontró la tabla en la página web'
+            'body': 'No se encontró la tabla de sismos en la página web'
         }
 
-    # Extraer los encabezados de la tabla
-    headers = [header.text.strip() for header in table.find_all('th')]
+    headers = [header.text.strip() for header in table.find_all('th') if header.text.strip()]
 
-    # Extraer las filas de la tabla (solo los 10 últimos sismos)
     rows = []
-    for row in table.find_all('tr')[1:11]:  # Omitir el encabezado, tomar 10 filas
+    tr_elements = table.find_all('tr')[1:]  
+    for row in tr_elements[:10]:
         cells = row.find_all('td')
-        rows.append({
-            headers[i]: cell.text.strip()
-            for i, cell in enumerate(cells)
-            if i < len(headers) and headers[i] != ''  # Omitir la columna del botón "Ver reporte"
-        })
+        if cells:
+            row_data = {}
+            for i, cell in enumerate(cells):
+                cell_text = cell.text.strip()
+                if "Ver reporte" in cell_text:
+                    continue                
+                if i < len(headers):
+                    col_name = headers[i]
+                    row_data[col_name] = cell_text
 
-    # Guardar los datos en DynamoDB
+            if row_data:
+                rows.append(row_data)
+
     dynamodb = boto3.resource('dynamodb')
-    table = dynamodb.Table('TablaSismosIGP')
+    table_db = dynamodb.Table('TablaSismosIGP')
 
-    # Eliminar todos los elementos de la tabla antes de agregar los nuevos
-    scan = table.scan()
-    with table.batch_writer() as batch:
-        for each in scan['Items']:
-            batch.delete_item(
-                Key={
-                    'id': each['id']
-                }
-            )
+    scan = table_db.scan()
+    with table_db.batch_writer() as batch:
+        for item in scan.get('Items', []):
+            batch.delete_item(Key={'id': item['id']})
 
-    # Insertar los nuevos datos
-    i = 1
-    for row in rows:
-        row['#'] = i
-        row['id'] = str(uuid.uuid4())  # Generar un ID único para cada entrada
-        table.put_item(Item=row)
-        i = i + 1
+    for index, row in enumerate(rows, start=1):
+        row['id'] = str(uuid.uuid4())
+        row['#'] = str(index)
+        table_db.put_item(Item=row)
 
-    # Retornar el resultado como JSON
     return {
         'statusCode': 200,
         'body': rows
