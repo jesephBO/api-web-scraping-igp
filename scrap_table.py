@@ -1,49 +1,50 @@
 import requests
-from bs4 import BeautifulSoup
 import boto3
 import uuid
+from datetime import datetime
 
 def lambda_handler(event, context):
-    url = "https://ultimosismo.igp.gob.pe/productos/reportes-sismicos"
+    anio = datetime.now().year
+    url = f"https://ultimosismo.igp.gob.pe/api/ultimo-sismo/ajaxb/{anio}"
 
     headers_req = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Referer': 'https://ultimosismo.igp.gob.pe/productos/reportes-sismicos'
     }
 
-    response = requests.get(url, headers=headers_req)
+    response = requests.get(url, headers=headers_req, timeout=15)
     if response.status_code != 200:
         return {
             'statusCode': response.status_code,
             'body': 'Error al acceder a la página web del IGP'
         }
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    table = soup.find('table')
-    if not table:
+    sismos = response.json()
+    if not sismos:
         return {
             'statusCode': 404,
-            'body': 'No se encontró la tabla de sismos en la página web'
+            'body': 'No se encontraron sismos en la página web'
         }
 
-    headers = [header.text.strip() for header in table.find_all('th') if header.text.strip()]
 
+    sismos.sort(key=lambda s: s['codigo'], reverse=True)
     rows = []
-    tr_elements = table.find_all('tr')[1:]  
-    for row in tr_elements[:10]:
-        cells = row.find_all('td')
-        if cells:
-            row_data = {}
-            for i, cell in enumerate(cells):
-                cell_text = cell.text.strip()
-                if "Ver reporte" in cell_text:
-                    continue                
-                if i < len(headers):
-                    col_name = headers[i]
-                    row_data[col_name] = cell_text
+    for sismo in sismos[:10]:
+        fecha = datetime.strptime(sismo['fecha_local'][:10], '%Y-%m-%d').strftime('%d/%m/%Y')
+        hora = sismo['hora_local'][11:19]
 
-            if row_data:
-                rows.append(row_data)
+        row_data = {
+            'Cod reporte': f"IGP/CENSIS/RS {sismo['codigo']}",
+            'Referencia': str(sismo['referencia']),
+            'Magnitud': str(sismo['magnitud']),
+            'Fecha y hora de origen local': f"{fecha} {hora}",
+            'Profundidad': str(sismo['profundidad']),
+            'Latitud': str(sismo['latitud']),
+            'Longitud': str(sismo['longitud']),
+            'Intensidad': str(sismo['intensidad'])
+        }
+        rows.append(row_data)
 
     dynamodb = boto3.resource('dynamodb')
     table_db = dynamodb.Table('TablaSismosIGP')
