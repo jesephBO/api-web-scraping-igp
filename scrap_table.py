@@ -4,8 +4,7 @@ import uuid
 from datetime import datetime
 
 def lambda_handler(event, context):
-    anio = datetime.now().year
-    url = f"https://ultimosismo.igp.gob.pe/api/ultimo-sismo/ajaxb/{anio}"
+    url = f"https://ultimosismo.igp.gob.pe/api/ultimo-sismo/ajaxb/2026"
 
     headers_req = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
