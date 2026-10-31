@@ -7,7 +7,7 @@ provider:
   memorySize: 1024
   timeout: 30
   iam:
-    role: arn:aws:iam::606646193182:role/LabRole
+    role: arn:aws:iam::246946388956:role/LabRole
 
 functions:
   scrape_table:
